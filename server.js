@@ -148,21 +148,21 @@ app.use((req, res) => {
 // SERVER
 // =========================================================
 
-const PORT =
-    process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;
 
+app.listen(PORT, "0.0.0.0", () => {
 
-app.listen(
-    PORT,
-    () => {
-
-        console.log(
-            `Andritz 2.0 Backend running on port ${PORT}`
-        );
-
-        console.log(
-            "Hostinger API is ready 🚀"
-        );
+    console.log("=================================");
+    console.log("ANDRITZ 2.0 BACKEND");
+    console.log("=================================");
+    console.log("PORT:", PORT);
+    console.log("ENV:", process.env.NODE_ENV || "not set");
+    console.log("ROLE API: /api/roles");
+    console.log("ADMIN API: /api/admins");
+    console.log("USER API: /api/users");
+    console.log("LOGIN API: /api/login");
+    console.log("=================================");
+    console.log("SERVER STARTED SUCCESSFULLY 🚀");
 
     }
 );
