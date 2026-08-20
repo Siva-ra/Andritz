@@ -3,18 +3,36 @@ const router = express.Router();
 
 const db = require("../config/db");
 
-
 // =========================================================
-// GET ALL ADMIN TYPES + ROLES
+// GET ALL ADMIN TYPES WITH THEIR ROLES
 // =========================================================
-// GET /api/role-management
+// GET:
+// /api/role-management
+//
+// Response:
+//
+// {
+//     "success": true,
+//     "adminTypes": [
+//         {
+//             "id": 1,
+//             "admin_name": "Engineering",
+//             "roles": [
+//                 {
+//                     "id": 1,
+//                     "role_name": "Animator"
+//                 },
+//                 {
+//                     "id": 2,
+//                     "role_name": "3D Artist"
+//                 }
+//             ]
+//         }
+//     ]
+// }
 // =========================================================
 
 router.get("/", async (req, res) => {
-
-    console.log("=================================");
-    console.log("GET /api/role-management");
-    console.log("=================================");
 
     try {
 
@@ -22,6 +40,7 @@ router.get("/", async (req, res) => {
             SELECT
                 a.id AS admin_type_id,
                 a.admin_name,
+
                 r.id AS role_id,
                 r.role_name
 
@@ -31,19 +50,29 @@ router.get("/", async (req, res) => {
                 ON r.admin_type_id = a.id
 
             ORDER BY
-                a.id ASC,
-                r.id ASC
+                a.admin_name ASC,
+                r.role_name ASC
         `);
 
 
-        const adminTypes = {};
+        const adminTypes = [];
 
 
-        rows.forEach(row => {
+        for (const row of rows) {
 
-            if (!adminTypes[row.admin_type_id]) {
+            let admin = adminTypes.find(
+                item =>
+                    item.id === row.admin_type_id
+            );
 
-                adminTypes[row.admin_type_id] = {
+
+            // =================================================
+            // CREATE ADMIN OBJECT
+            // =================================================
+
+            if (!admin) {
+
+                admin = {
 
                     id:
                         row.admin_type_id,
@@ -55,12 +84,17 @@ router.get("/", async (req, res) => {
 
                 };
 
+                adminTypes.push(admin);
             }
 
 
-            if (row.role_id) {
+            // =================================================
+            // ADD ROLE
+            // =================================================
 
-                adminTypes[row.admin_type_id].roles.push({
+            if (row.role_id !== null) {
+
+                admin.roles.push({
 
                     id:
                         row.role_id,
@@ -72,33 +106,28 @@ router.get("/", async (req, res) => {
 
             }
 
-        });
+        }
 
 
-        const result =
-            Object.values(adminTypes);
+        // =====================================================
+        // SUCCESS
+        // =====================================================
 
-
-        console.log(
-            "Admin Types:",
-            result
-        );
-
-
-        res.status(200).json({
+        res.json({
 
             success: true,
 
             adminTypes:
-                result
+                adminTypes
 
         });
 
     }
+
     catch (error) {
 
         console.error(
-            "GET ROLE MANAGEMENT ERROR:",
+            "Load Role Management Error:",
             error
         );
 
@@ -121,9 +150,32 @@ router.get("/", async (req, res) => {
 
 
 // =========================================================
-// SAVE ADMIN TYPE + ROLES
+// SAVE ADMIN + ROLES
 // =========================================================
-// POST /api/role-management
+// POST:
+// /api/role-management
+//
+// Body:
+//
+// {
+//     "adminName": "Engineering",
+//     "roles": [
+//         "Animator",
+//         "3D Artist",
+//         "Developer"
+//     ]
+// }
+//
+// Behaviour:
+//
+// - If Admin Type does not exist:
+//      Create Admin Type + Roles
+//
+// - If Admin Type already exists:
+//      Add only new roles
+//
+// - Duplicate roles are ignored
+//
 // =========================================================
 
 router.post("/", async (req, res) => {
@@ -133,17 +185,22 @@ router.post("/", async (req, res) => {
 
     try {
 
+        // =====================================================
+        // GET DATABASE CONNECTION
+        // =====================================================
+
+        connection =
+            await db.getConnection();
+
+
+        // =====================================================
+        // READ REQUEST
+        // =====================================================
+
         const {
             adminName,
             roles
         } = req.body;
-
-
-        console.log("=================================");
-        console.log("POST /api/role-management");
-        console.log("Admin Name:", adminName);
-        console.log("Roles:", roles);
-        console.log("=================================");
 
 
         // =====================================================
@@ -189,38 +246,71 @@ router.post("/", async (req, res) => {
 
 
         // =====================================================
-        // CLEAN DATA
+        // CLEAN ADMIN NAME
         // =====================================================
 
         const cleanAdminName =
             adminName.trim();
 
 
-        const cleanRoles = [
-            ...new Set(
+        // =====================================================
+        // CLEAN ROLES
+        // =====================================================
 
-                roles
+        const cleanRoles =
+            roles
 
-                    .filter(
-                        role =>
-                            typeof role === "string"
-                    )
+                .filter(
+                    role =>
+                        typeof role === "string"
+                )
 
-                    .map(
-                        role =>
-                            role.trim()
-                    )
+                .map(
+                    role =>
+                        role.trim()
+                )
 
-                    .filter(
-                        role =>
-                            role.length > 0
-                    )
-
-            )
-        ];
+                .filter(
+                    role =>
+                        role.length > 0
+                );
 
 
-        if (cleanRoles.length === 0) {
+        // =====================================================
+        // REMOVE DUPLICATE ROLES
+        // CASE-INSENSITIVE
+        // =====================================================
+
+        const uniqueRoles = [];
+
+        const roleKeys = new Set();
+
+
+        for (const role of cleanRoles) {
+
+            const roleKey =
+                role.toLowerCase();
+
+
+            if (roleKeys.has(roleKey)) {
+
+                continue;
+
+            }
+
+
+            roleKeys.add(roleKey);
+
+            uniqueRoles.push(role);
+
+        }
+
+
+        // =====================================================
+        // CHECK VALID ROLES
+        // =====================================================
+
+        if (uniqueRoles.length === 0) {
 
             return res.status(400).json({
 
@@ -235,95 +325,140 @@ router.post("/", async (req, res) => {
 
 
         // =====================================================
-        // DATABASE CONNECTION
+        // START TRANSACTION
         // =====================================================
-
-        connection =
-            await db.getConnection();
-
 
         await connection.beginTransaction();
 
 
         // =====================================================
-        // CHECK ADMIN TYPE
+        // FIND EXISTING ADMIN TYPE
         // =====================================================
 
-        const [existingAdmin] =
-            await connection.query(
-                `
-                SELECT
-                    id,
-                    admin_name
+        const [
+            existingAdmin
+        ] = await connection.query(
 
-                FROM admin_types
+            `
+            SELECT
+                id,
+                admin_name
 
-                WHERE admin_name = ?
+            FROM admin_types
 
-                LIMIT 1
-                `,
-                [
-                    cleanAdminName
-                ]
-            );
+            WHERE LOWER(admin_name) = LOWER(?)
+
+            LIMIT 1
+            `,
+
+            [
+                cleanAdminName
+            ]
+
+        );
 
 
         let adminTypeId;
 
+        let finalAdminName;
+
 
         // =====================================================
-        // CREATE ADMIN TYPE
+        // CREATE ADMIN TYPE IF NOT EXISTS
         // =====================================================
 
         if (existingAdmin.length === 0) {
 
-            const [adminResult] =
-                await connection.query(
-                    `
-                    INSERT INTO admin_types
-                    (
-                        admin_name
-                    )
+            const [
+                adminResult
+            ] = await connection.query(
 
-                    VALUES (?)
-                    `,
-                    [
-                        cleanAdminName
-                    ]
-                );
+                `
+                INSERT INTO admin_types
+                (
+                    admin_name
+                )
+
+                VALUES (?)
+                `,
+
+                [
+                    cleanAdminName
+                ]
+
+            );
 
 
             adminTypeId =
                 adminResult.insertId;
 
-
-            console.log(
-                "Created Admin Type:",
-                adminTypeId
-            );
+            finalAdminName =
+                cleanAdminName;
 
         }
-
-        // =====================================================
-        // USE EXISTING ADMIN TYPE
-        // =====================================================
 
         else {
 
             adminTypeId =
                 existingAdmin[0].id;
 
+            finalAdminName =
+                existingAdmin[0].admin_name;
 
-            console.log(
-                "Existing Admin Type:",
+        }
+
+
+        // =====================================================
+        // GET EXISTING ROLES
+        // =====================================================
+
+        const [
+            existingRoles
+        ] = await connection.query(
+
+            `
+            SELECT
+                id,
+                role_name
+
+            FROM roles
+
+            WHERE admin_type_id = ?
+            `,
+
+            [
                 adminTypeId
+            ]
+
+        );
+
+
+        // =====================================================
+        // CREATE SET OF EXISTING ROLES
+        // =====================================================
+
+        const existingRoleKeys =
+            new Set();
+
+
+        for (
+            const existingRole
+            of existingRoles
+        ) {
+
+            existingRoleKeys.add(
+
+                existingRole.role_name
+                    .trim()
+                    .toLowerCase()
+
             );
 
         }
 
 
         // =====================================================
-        // INSERT ROLES
+        // INSERT NEW ROLES
         // =====================================================
 
         const addedRoles = [];
@@ -331,56 +466,72 @@ router.post("/", async (req, res) => {
 
         for (
             const roleName
-            of cleanRoles
+            of uniqueRoles
         ) {
 
-            const [existingRole] =
-                await connection.query(
-                    `
-                    SELECT
-                        id
+            const roleKey =
+                roleName.toLowerCase();
 
-                    FROM roles
 
-                    WHERE admin_type_id = ?
-
-                    AND role_name = ?
-
-                    LIMIT 1
-                    `,
-                    [
-                        adminTypeId,
-                        roleName
-                    ]
-                );
-
+            // -------------------------------------------------
+            // SKIP DUPLICATE
+            // -------------------------------------------------
 
             if (
-                existingRole.length === 0
+                existingRoleKeys.has(
+                    roleKey
+                )
             ) {
 
-                await connection.query(
-                    `
-                    INSERT INTO roles
-                    (
-                        admin_type_id,
-                        role_name
-                    )
-
-                    VALUES (?, ?)
-                    `,
-                    [
-                        adminTypeId,
-                        roleName
-                    ]
-                );
-
-
-                addedRoles.push(
-                    roleName
-                );
+                continue;
 
             }
+
+
+            // -------------------------------------------------
+            // INSERT ROLE
+            // -------------------------------------------------
+
+            const [
+                roleResult
+            ] = await connection.query(
+
+                `
+                INSERT INTO roles
+                (
+                    admin_type_id,
+                    role_name
+                )
+
+                VALUES (?, ?)
+                `,
+
+                [
+                    adminTypeId,
+                    roleName
+                ]
+
+            );
+
+
+            addedRoles.push({
+
+                id:
+                    roleResult.insertId,
+
+                role_name:
+                    roleName
+
+            });
+
+
+            // -------------------------------------------------
+            // ADD TO EXISTING SET
+            // -------------------------------------------------
+
+            existingRoleKeys.add(
+                roleKey
+            );
 
         }
 
@@ -392,14 +543,30 @@ router.post("/", async (req, res) => {
         await connection.commit();
 
 
-        console.log(
-            "Admin Type Saved:",
-            cleanAdminName
-        );
+        // =====================================================
+        // GET COMPLETE ADMIN DATA
+        // =====================================================
 
-        console.log(
-            "Roles Added:",
-            addedRoles
+        const [
+            savedRoles
+        ] = await db.query(
+
+            `
+            SELECT
+                id,
+                role_name
+
+            FROM roles
+
+            WHERE admin_type_id = ?
+
+            ORDER BY role_name ASC
+            `,
+
+            [
+                adminTypeId
+            ]
+
         );
 
 
@@ -407,12 +574,17 @@ router.post("/", async (req, res) => {
         // SUCCESS RESPONSE
         // =====================================================
 
-        res.status(200).json({
+        res.status(201).json({
 
             success: true,
 
             message:
-                "Admin and roles saved successfully",
+                addedRoles.length > 0
+
+                    ? "Admin and roles saved successfully"
+
+                    : "Admin already exists and no new roles were added",
+
 
             admin: {
 
@@ -420,12 +592,13 @@ router.post("/", async (req, res) => {
                     adminTypeId,
 
                 admin_name:
-                    cleanAdminName,
+                    finalAdminName,
 
                 roles:
-                    cleanRoles
+                    savedRoles
 
             },
+
 
             addedRoles:
                 addedRoles
@@ -433,13 +606,13 @@ router.post("/", async (req, res) => {
         });
 
     }
+
+
     catch (error) {
 
-        console.error(
-            "POST ROLE MANAGEMENT ERROR:",
-            error
-        );
-
+        // =====================================================
+        // ROLLBACK
+        // =====================================================
 
         if (connection) {
 
@@ -448,6 +621,7 @@ router.post("/", async (req, res) => {
                 await connection.rollback();
 
             }
+
             catch (rollbackError) {
 
                 console.error(
@@ -459,6 +633,20 @@ router.post("/", async (req, res) => {
 
         }
 
+
+        // =====================================================
+        // LOG ERROR
+        // =====================================================
+
+        console.error(
+            "Save Role Management Error:",
+            error
+        );
+
+
+        // =====================================================
+        // RESPONSE
+        // =====================================================
 
         res.status(500).json({
 
@@ -473,7 +661,13 @@ router.post("/", async (req, res) => {
         });
 
     }
+
+
     finally {
+
+        // =====================================================
+        // RELEASE CONNECTION
+        // =====================================================
 
         if (connection) {
 
