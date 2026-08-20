@@ -4,6 +4,21 @@ require("dotenv").config();
 
 const db = require("./config/db");
 
+// =========================================================
+// ROUTES
+// =========================================================
+
+const roleRoutes = require("./routes/roleRoutes");
+const roleManagementRoutes = require("./routes/roleManagementRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const userRoutes = require("./routes/userRoutes");
+const loginRoutes = require("./routes/loginRoutes");
+
+
+// =========================================================
+// CREATE EXPRESS APP
+// =========================================================
+
 const app = express();
 
 
@@ -11,279 +26,134 @@ const app = express();
 // MIDDLEWARE
 // =========================================================
 
+// Allow Unity / WebGL / other clients
 app.use(cors());
 
+// JSON request body
 app.use(express.json());
 
-app.use(express.urlencoded({
-    extended: true
-}));
+// Form request body
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
 
 
 // =========================================================
-// HOME
+// API ROUTES
+// =========================================================
+
+// ---------------------------------------------------------
+// OLD / BASIC ROLE API
+// ---------------------------------------------------------
+
+app.use(
+    "/api/roles",
+    roleRoutes
+);
+
+
+// ---------------------------------------------------------
+// ROLE MANAGEMENT
+// ---------------------------------------------------------
+// Unity Role Management Panel uses:
+//
+// POST /api/role-management
+// GET  /api/role-management
+//
+// ---------------------------------------------------------
+
+app.use(
+    "/api/role-management",
+    roleManagementRoutes
+);
+
+
+// ---------------------------------------------------------
+// CREATE ADMIN
+// ---------------------------------------------------------
+
+app.use(
+    "/api/admins",
+    adminRoutes
+);
+
+
+// ---------------------------------------------------------
+// CREATE USER
+// ---------------------------------------------------------
+
+app.use(
+    "/api/users",
+    userRoutes
+);
+
+
+// ---------------------------------------------------------
+// LOGIN
+// ---------------------------------------------------------
+
+app.use(
+    "/api/login",
+    loginRoutes
+);
+
+
+// =========================================================
+// HOME / SERVER TEST
 // =========================================================
 
 app.get("/", (req, res) => {
 
-    res.json({
+    res.status(200).json({
+
         success: true,
-        message: "Andritz 2.0 Backend is running 🚀",
-        server: "Hostinger"
+
+        message:
+            "Andritz 2.0 Backend is running 🚀",
+
+        server:
+            "Hostinger",
+
+        database:
+            "MySQL",
+
+        api: {
+
+            roles:
+                "/api/roles",
+
+            roleManagement:
+                "/api/role-management",
+
+            admins:
+                "/api/admins",
+
+            users:
+                "/api/users",
+
+            login:
+                "/api/login"
+        }
+
     });
 
 });
 
 
 // =========================================================
-// DATABASE TEST
+// MYSQL TEST
 // =========================================================
 
 app.get("/test-db", async (req, res) => {
 
     try {
 
-        const [result] = await db.query(
-            "SELECT 1 AS test"
-        );
-
-        res.json({
-            success: true,
-            message: "MySQL connected successfully ✅",
-            result: result
-        });
-
-    } catch (error) {
-
-        console.error("MySQL Error:", error);
-
-        res.status(500).json({
-            success: false,
-            message: "MySQL connection failed ❌",
-            error: error.message
-        });
-
-    }
-
-});
-
-
-// =========================================================
-// ROLE MANAGEMENT
-// GET ALL SAVED ROLES
-// =========================================================
-
-app.get("/api/role-management", async (req, res) => {
-
-    console.log("GET /api/role-management");
-
-    try {
-
-        const [rows] = await db.query(`
-            SELECT
-                id,
-                admin_name,
-                role_name,
-                created_at
-            FROM admin_roles
-            ORDER BY admin_name ASC, id ASC
-        `);
-
-        res.json({
-            success: true,
-            data: rows
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Get Role Management Error:",
-            error
-        );
-
-        res.status(500).json({
-            success: false,
-            message: "Failed to load roles",
-            error: error.message
-        });
-
-    }
-
-});
-
-
-// =========================================================
-// ROLE MANAGEMENT
-// SAVE ADMIN + MULTIPLE ROLES
-// =========================================================
-
-app.post("/api/role-management", async (req, res) => {
-
-    console.log("=================================");
-    console.log("POST /api/role-management");
-    console.log("Request Body:", req.body);
-    console.log("=================================");
-
-
-    try {
-
-        const {
-            adminName,
-            roles
-        } = req.body;
-
-
-        // =====================================================
-        // CHECK ADMIN NAME
-        // =====================================================
-
-        if (
-            !adminName ||
-            typeof adminName !== "string" ||
-            !adminName.trim()
-        ) {
-
-            return res.status(400).json({
-                success: false,
-                message: "Admin name is required"
-            });
-
-        }
-
-
-        // =====================================================
-        // CHECK ROLES
-        // =====================================================
-
-        if (
-            !Array.isArray(roles) ||
-            roles.length === 0
-        ) {
-
-            return res.status(400).json({
-                success: false,
-                message: "At least one role is required"
-            });
-
-        }
-
-
-        // =====================================================
-        // CLEAN ADMIN NAME
-        // =====================================================
-
-        const cleanAdminName =
-            adminName.trim();
-
-
-        // =====================================================
-        // CLEAN ROLES
-        // Remove empty roles
-        // Remove duplicate roles
-        // =====================================================
-
-        const cleanRoles = [
-            ...new Set(
-                roles
-                    .filter(
-                        role =>
-                            typeof role === "string"
-                    )
-                    .map(
-                        role =>
-                            role.trim()
-                    )
-                    .filter(
-                        role =>
-                            role.length > 0
-                    )
-            )
-        ];
-
-
-        // =====================================================
-        // CHECK CLEANED ROLES
-        // =====================================================
-
-        if (cleanRoles.length === 0) {
-
-            return res.status(400).json({
-                success: false,
-                message: "No valid roles provided"
-            });
-
-        }
-
-
-        // =====================================================
-        // SAVE EACH ROLE
-        // =====================================================
-
-        const addedRoles = [];
-
-
-        for (const role of cleanRoles) {
-
-            // -------------------------------------------------
-            // Check if this admin + role already exists
-            // -------------------------------------------------
-
-            const [existing] = await db.query(
-                `
-                SELECT id
-                FROM admin_roles
-                WHERE admin_name = ?
-                AND role_name = ?
-                LIMIT 1
-                `,
-                [
-                    cleanAdminName,
-                    role
-                ]
+        const [result] =
+            await db.query(
+                "SELECT 1 AS test"
             );
-
-
-            // -------------------------------------------------
-            // Insert only if it does not exist
-            // -------------------------------------------------
-
-            if (existing.length === 0) {
-
-                await db.query(
-                    `
-                    INSERT INTO admin_roles
-                    (
-                        admin_name,
-                        role_name
-                    )
-                    VALUES (?, ?)
-                    `,
-                    [
-                        cleanAdminName,
-                        role
-                    ]
-                );
-
-                addedRoles.push(role);
-
-            }
-
-        }
-
-
-        // =====================================================
-        // SUCCESS
-        // =====================================================
-
-        console.log(
-            "Saved Admin:",
-            cleanAdminName
-        );
-
-        console.log(
-            "Saved Roles:",
-            addedRoles
-        );
 
 
         res.status(200).json({
@@ -291,23 +161,17 @@ app.post("/api/role-management", async (req, res) => {
             success: true,
 
             message:
-                "Admin and roles saved successfully",
+                "MySQL connected successfully ✅",
 
-            adminName:
-                cleanAdminName,
-
-            roles:
-                cleanRoles,
-
-            addedRoles:
-                addedRoles
+            result
 
         });
 
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
-            "Save Role Management Error:",
+            "❌ MySQL Connection Error:",
             error
         );
 
@@ -317,7 +181,7 @@ app.post("/api/role-management", async (req, res) => {
             success: false,
 
             message:
-                "Failed to save roles",
+                "MySQL connection failed ❌",
 
             error:
                 error.message
@@ -330,16 +194,17 @@ app.post("/api/role-management", async (req, res) => {
 
 
 // =========================================================
-// 404 HANDLER
+// API 404 HANDLER
 // =========================================================
 
 app.use((req, res) => {
 
     console.log(
-        "404:",
+        "❌ 404:",
         req.method,
         req.originalUrl
     );
+
 
     res.status(404).json({
 
@@ -360,6 +225,35 @@ app.use((req, res) => {
 
 
 // =========================================================
+// GLOBAL ERROR HANDLER
+// =========================================================
+
+app.use(
+    (error, req, res, next) => {
+
+        console.error(
+            "❌ SERVER ERROR:",
+            error
+        );
+
+
+        res.status(500).json({
+
+            success: false,
+
+            message:
+                "Internal server error",
+
+            error:
+                error.message
+
+        });
+
+    }
+);
+
+
+// =========================================================
 // START SERVER
 // =========================================================
 
@@ -377,7 +271,7 @@ app.listen(
         );
 
         console.log(
-            "ANDRITZ 2.0 BACKEND"
+            "       ANDRITZ 2.0 BACKEND"
         );
 
         console.log(
@@ -385,8 +279,7 @@ app.listen(
         );
 
         console.log(
-            "Environment:",
-            process.env.NODE_ENV || "production"
+            "Server: Hostinger"
         );
 
         console.log(
@@ -395,23 +288,80 @@ app.listen(
         );
 
         console.log(
-            "Server: Hostinger"
+            "Environment:",
+            process.env.NODE_ENV || "production"
         );
 
         console.log(
-            "GET  /api/role-management"
+            "----------------------------------------"
         );
 
         console.log(
-            "POST /api/role-management"
+            "ROLE API:"
         );
 
         console.log(
-            "========================================"
+            "GET/POST/DELETE /api/roles"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "ROLE MANAGEMENT:"
+        );
+
+        console.log(
+            "GET/POST /api/role-management"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "ADMIN API:"
+        );
+
+        console.log(
+            "GET/POST /api/admins"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "USER API:"
+        );
+
+        console.log(
+            "GET/POST /api/users"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "LOGIN API:"
+        );
+
+        console.log(
+            "POST /api/login"
+        );
+
+        console.log(
+            "----------------------------------------"
         );
 
         console.log(
             "SERVER STARTED SUCCESSFULLY 🚀"
+        );
+
+        console.log(
+            "========================================"
         );
 
     }
