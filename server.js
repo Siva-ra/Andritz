@@ -8,69 +8,67 @@ const roleRoutes = require("./routes/roleRoutes");
 const app = express();
 
 
-// ==================================================
+// =========================================================
 // MIDDLEWARE
-// ==================================================
+// =========================================================
 
 app.use(cors());
 
 app.use(express.json());
 
-app.use(express.urlencoded({ extended: true }));
 
-
-// ==================================================
-// DATABASE
-// ==================================================
-
-app.locals.db = db;
-
-
-// ==================================================
-// HOME ROUTE
-// ==================================================
+// =========================================================
+// HOME
+// =========================================================
 
 app.get("/", (req, res) => {
+
     res.json({
         success: true,
         message: "Andritz 2.0 Backend is running 🚀"
     });
+
 });
 
 
-// ==================================================
-// ROLE ROUTES
-// ==================================================
-
-app.use("/api/roles", roleRoutes);
-
-
-// ==================================================
-// TEST MYSQL CONNECTION
-// ==================================================
+// =========================================================
+// DATABASE TEST
+// =========================================================
 
 app.get("/test-db", async (req, res) => {
 
     try {
 
-        const [result] = await db.query(
-            "SELECT 1 AS test"
-        );
+        const [result] =
+            await db.query(
+                "SELECT 1 AS test"
+            );
+
 
         res.json({
             success: true,
             message: "MySQL connected successfully ✅",
-            result: result
+            result
         });
+
 
     } catch (error) {
 
-        console.error("MySQL Error:", error);
+        console.error(
+            "MySQL Error:",
+            error
+        );
+
 
         res.status(500).json({
+
             success: false,
-            message: "MySQL connection failed ❌",
-            error: error.message
+
+            message:
+                "MySQL connection failed ❌",
+
+            error:
+                error.message
         });
 
     }
@@ -78,52 +76,51 @@ app.get("/test-db", async (req, res) => {
 });
 
 
-// ==================================================
-// 404 ROUTE
-// ==================================================
+// =========================================================
+// ROLE ROUTES
+// =========================================================
+
+app.use(
+    "/roles",
+    roleRoutes
+);
+
+
+// =========================================================
+// 404 HANDLER
+// =========================================================
 
 app.use((req, res) => {
 
     res.status(404).json({
+
         success: false,
-        message: "API route not found",
-        path: req.originalUrl
+
+        message:
+            "API endpoint not found",
+
+        path:
+            req.originalUrl
     });
 
 });
 
 
-// ==================================================
-// ERROR HANDLER
-// ==================================================
+// =========================================================
+// SERVER
+// =========================================================
 
-app.use((error, req, res, next) => {
-
-    console.error("Server Error:", error);
-
-    res.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error: error.message
-    });
-
-});
+const PORT =
+    process.env.PORT || 5000;
 
 
-// ==================================================
-// START SERVER
-// ==================================================
+app.listen(
+    PORT,
+    () => {
 
-const PORT = process.env.PORT || 5000;
+        console.log(
+            `✅Server running on port ${PORT}`
+        );
 
-app.listen(PORT, () => {
-
-    console.log("========================================");
-    console.log("🚀 ANDRITZ 2.0 BACKEND");
-    console.log("========================================");
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`Role API: /api/roles`);
-    console.log(`Database test: /test-db`);
-    console.log("========================================");
-
-});
+    }
+);
