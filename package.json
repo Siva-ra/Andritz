@@ -1,10 +1,11 @@
 {
   "name": "andritz-2.0-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Andritz 2.0 Backend API",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "keywords": [],
   "author": "",
