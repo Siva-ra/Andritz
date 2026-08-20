@@ -4,10 +4,6 @@ const router = express.Router();
 
 const db = require("../config/db");
 
-const {
-    requireSuperAdmin
-} = require("../config/auth");
-
 
 // =========================================================
 // GET ADMIN TYPES
@@ -16,12 +12,6 @@ const {
 router.get("/types", async (req, res) => {
 
     try {
-
-        const session =
-            await requireSuperAdmin(req, res);
-
-        if (!session) return;
-
 
         const [rows] = await db.query(
             `SELECT
@@ -62,12 +52,6 @@ router.post("/", async (req, res) => {
 
     try {
 
-        const session =
-            await requireSuperAdmin(req, res);
-
-        if (!session) return;
-
-
         const {
             email,
             adminTypeId
@@ -99,10 +83,6 @@ router.post("/", async (req, res) => {
             email.trim().toLowerCase();
 
 
-        // =================================================
-        // CHECK ADMIN TYPE
-        // =================================================
-
         const [adminTypeRows] =
             await db.query(
                 `SELECT
@@ -128,10 +108,6 @@ router.post("/", async (req, res) => {
             adminTypeRows[0];
 
 
-        // =================================================
-        // CHECK EMAIL
-        // =================================================
-
         const [existing] =
             await db.query(
                 `SELECT id
@@ -150,10 +126,6 @@ router.post("/", async (req, res) => {
             });
         }
 
-
-        // =================================================
-        // CREATE ADMIN
-        // =================================================
 
         const [result] =
             await db.query(
@@ -174,12 +146,23 @@ router.post("/", async (req, res) => {
 
 
         res.status(201).json({
+
             success: true,
-            message: "Admin created successfully",
-            id: result.insertId,
-            email: cleanEmail,
-            adminTypeId: adminType.id,
-            adminType: adminType.admin_name
+
+            message:
+                "Admin created successfully",
+
+            id:
+                result.insertId,
+
+            email:
+                cleanEmail,
+
+            adminTypeId:
+                adminType.id,
+
+            adminType:
+                adminType.admin_name
         });
 
     }

@@ -1,25 +1,17 @@
 const express = require("express");
+
 const router = express.Router();
 
 const db = require("../config/db");
-const {
-    requireSuperAdmin
-} = require("../config/auth");
 
 
 // =========================================================
-// GET ALL ADMIN TYPES + THEIR ROLES
+// GET ALL ADMIN TYPES + ROLES
 // =========================================================
 
 router.get("/", async (req, res) => {
 
     try {
-
-        const session =
-            await requireSuperAdmin(req, res);
-
-        if (!session) return;
-
 
         const [adminTypes] = await db.query(
             `SELECT
@@ -50,7 +42,7 @@ router.get("/", async (req, res) => {
 
         res.json({
             success: true,
-            adminTypes
+            adminTypes: adminTypes
         });
 
     }
@@ -63,7 +55,7 @@ router.get("/", async (req, res) => {
 
         res.status(500).json({
             success: false,
-            message: "Failed to load role management",
+            message: "Failed to load roles",
             error: error.message
         });
     }
@@ -71,7 +63,7 @@ router.get("/", async (req, res) => {
 
 
 // =========================================================
-// SAVE ADMIN TYPE + ALL ROLES
+// SAVE ADMIN + ROLES
 // =========================================================
 
 router.post("/", async (req, res) => {
@@ -81,21 +73,15 @@ router.post("/", async (req, res) => {
 
     try {
 
-        const session =
-            await requireSuperAdmin(req, res);
-
-        if (!session) {
-
-            connection.release();
-            return;
-        }
-
-
         const {
             adminName,
             roles
         } = req.body;
 
+
+        // =====================================================
+        // VALIDATION
+        // =====================================================
 
         if (
             !adminName ||
@@ -155,12 +141,16 @@ router.post("/", async (req, res) => {
             [...new Set(cleanRoles)];
 
 
+        // =====================================================
+        // START TRANSACTION
+        // =====================================================
+
         await connection.beginTransaction();
 
 
-        // =================================================
-        // FIND / CREATE ADMIN TYPE
-        // =================================================
+        // =====================================================
+        // FIND ADMIN TYPE
+        // =====================================================
 
         const [existingAdmin] =
             await connection.query(
@@ -174,6 +164,10 @@ router.post("/", async (req, res) => {
 
         let adminTypeId;
 
+
+        // =====================================================
+        // CREATE ADMIN TYPE IF IT DOESN'T EXIST
+        // =====================================================
 
         if (existingAdmin.length > 0) {
 
@@ -196,9 +190,9 @@ router.post("/", async (req, res) => {
         }
 
 
-        // =================================================
-        // INSERT ALL ROLES
-        // =================================================
+        // =====================================================
+        // SAVE EVERY ROLE
+        // =====================================================
 
         for (const role of uniqueRoles) {
 
@@ -214,15 +208,28 @@ router.post("/", async (req, res) => {
         }
 
 
+        // =====================================================
+        // COMMIT
+        // =====================================================
+
         await connection.commit();
 
 
         res.json({
+
             success: true,
-            message: "Admin and roles saved successfully",
-            adminTypeId: adminTypeId,
-            adminName: cleanAdminName,
-            roles: uniqueRoles
+
+            message:
+                "Admin and roles saved successfully",
+
+            adminTypeId:
+                adminTypeId,
+
+            adminName:
+                cleanAdminName,
+
+            roles:
+                uniqueRoles
         });
 
     }

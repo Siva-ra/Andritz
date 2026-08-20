@@ -4,31 +4,30 @@ const router = express.Router();
 
 const db = require("../config/db");
 
-const {
-    requireSuperAdmin
-} = require("../config/auth");
-
 
 // =========================================================
-// GET ADMIN TYPES
+// GET ALL ADMIN TYPES
+// =========================================================
+// Used by CREATE USER panel
+//
+// GET:
+// /api/users/admin-types
+//
+// Returns all admin types created in Role Management
 // =========================================================
 
 router.get("/admin-types", async (req, res) => {
 
     try {
 
-        const session =
-            await requireSuperAdmin(req, res);
-
-        if (!session) return;
-
-
         const [rows] = await db.query(
-            `SELECT
+            `
+            SELECT
                 id,
                 admin_name
-             FROM admin_types
-             ORDER BY admin_name ASC`
+            FROM admin_types
+            ORDER BY admin_name ASC
+            `
         );
 
 
@@ -41,7 +40,7 @@ router.get("/admin-types", async (req, res) => {
     catch (error) {
 
         console.error(
-            "User Admin Types Error:",
+            "Get Admin Types Error:",
             error
         );
 
@@ -55,7 +54,28 @@ router.get("/admin-types", async (req, res) => {
 
 
 // =========================================================
-// GET ROLES FOR SELECTED ADMIN
+// GET ROLES FOR SELECTED ADMIN TYPE
+// =========================================================
+// Used when the user selects an Admin Type
+//
+// GET:
+// /api/users/roles/1
+//
+// Example response:
+//
+// {
+//     "success": true,
+//     "roles": [
+//         {
+//             "id": 1,
+//             "role_name": "Animator"
+//         },
+//         {
+//             "id": 2,
+//             "role_name": "3D Artist"
+//         }
+//     ]
+// }
 // =========================================================
 
 router.get(
@@ -64,25 +84,30 @@ router.get(
 
         try {
 
-            const session =
-                await requireSuperAdmin(req, res);
-
-            if (!session) return;
-
-
             const {
                 adminTypeId
             } = req.params;
 
 
+            if (!adminTypeId) {
+
+                return res.status(400).json({
+                    success: false,
+                    message: "Admin type ID is required"
+                });
+            }
+
+
             const [rows] =
                 await db.query(
-                    `SELECT
+                    `
+                    SELECT
                         id,
                         role_name
-                     FROM roles
-                     WHERE admin_type_id = ?
-                     ORDER BY role_name ASC`,
+                    FROM roles
+                    WHERE admin_type_id = ?
+                    ORDER BY role_name ASC
+                    `,
                     [adminTypeId]
                 );
 
@@ -96,7 +121,7 @@ router.get(
         catch (error) {
 
             console.error(
-                "Get User Roles Error:",
+                "Get Roles Error:",
                 error
             );
 
@@ -113,16 +138,23 @@ router.get(
 // =========================================================
 // CREATE USER
 // =========================================================
+// POST:
+// /api/users
+//
+// Body:
+//
+// {
+//     "email": "user@gmail.com",
+//     "adminTypeId": 1,
+//     "roleId": 2
+// }
+//
+// The selected role MUST belong to the selected admin.
+// =========================================================
 
 router.post("/", async (req, res) => {
 
     try {
-
-        const session =
-            await requireSuperAdmin(req, res);
-
-        if (!session) return;
-
 
         const {
             email,
@@ -130,6 +162,10 @@ router.post("/", async (req, res) => {
             roleId
         } = req.body;
 
+
+        // =====================================================
+        // VALIDATE EMAIL
+        // =====================================================
 
         if (
             !email ||
@@ -143,6 +179,10 @@ router.post("/", async (req, res) => {
         }
 
 
+        // =====================================================
+        // VALIDATE ADMIN TYPE
+        // =====================================================
+
         if (!adminTypeId) {
 
             return res.status(400).json({
@@ -151,6 +191,10 @@ router.post("/", async (req, res) => {
             });
         }
 
+
+        // =====================================================
+        // VALIDATE ROLE
+        // =====================================================
 
         if (!roleId) {
 
@@ -165,23 +209,33 @@ router.post("/", async (req, res) => {
             email.trim().toLowerCase();
 
 
-        // =================================================
+        // =====================================================
         // CHECK ADMIN TYPE + ROLE
-        // =================================================
+        // =====================================================
+        // This guarantees that the selected role belongs
+        // to the selected admin type.
+        // =====================================================
 
         const [roleRows] =
             await db.query(
-                `SELECT
+                `
+                SELECT
                     r.id AS role_id,
                     r.role_name,
+
                     a.id AS admin_type_id,
                     a.admin_name
-                 FROM roles r
-                 INNER JOIN admin_types a
+
+                FROM roles r
+
+                INNER JOIN admin_types a
                     ON a.id = r.admin_type_id
-                 WHERE r.id = ?
-                 AND a.id = ?
-                 LIMIT 1`,
+
+                WHERE r.id = ?
+                AND a.id = ?
+
+                LIMIT 1
+                `,
                 [
                     roleId,
                     adminTypeId
@@ -203,16 +257,19 @@ router.post("/", async (req, res) => {
             roleRows[0];
 
 
-        // =================================================
-        // CHECK EMAIL
-        // =================================================
+        // =====================================================
+        // CHECK WHETHER EMAIL ALREADY EXISTS
+        // =====================================================
 
         const [existing] =
             await db.query(
-                `SELECT id
-                 FROM accounts
-                 WHERE email = ?
-                 LIMIT 1`,
+                `
+                SELECT
+                    id
+                FROM accounts
+                WHERE email = ?
+                LIMIT 1
+                `,
                 [cleanEmail]
             );
 
@@ -226,13 +283,14 @@ router.post("/", async (req, res) => {
         }
 
 
-        // =================================================
+        // =====================================================
         // CREATE USER
-        // =================================================
+        // =====================================================
 
         const [result] =
             await db.query(
-                `INSERT INTO accounts
+                `
+                INSERT INTO accounts
                 (
                     email,
                     account_type,
@@ -240,7 +298,13 @@ router.post("/", async (req, res) => {
                     role_id
                 )
                 VALUES
-                (?, 'user', ?, ?)`,
+                (
+                    ?,
+                    'user',
+                    ?,
+                    ?
+                )
+                `,
                 [
                     cleanEmail,
                     selected.admin_type_id,
@@ -249,19 +313,37 @@ router.post("/", async (req, res) => {
             );
 
 
+        // =====================================================
+        // RESPONSE
+        // =====================================================
+
         res.status(201).json({
+
             success: true,
-            message: "User created successfully",
 
-            id: result.insertId,
+            message:
+                "User created successfully",
 
-            email: cleanEmail,
+            id:
+                result.insertId,
+
+            email:
+                cleanEmail,
+
+            accountType:
+                "user",
 
             adminType:
                 selected.admin_name,
 
+            adminTypeId:
+                selected.admin_type_id,
+
             role:
-                selected.role_name
+                selected.role_name,
+
+            roleId:
+                selected.role_id
         });
 
     }

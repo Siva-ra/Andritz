@@ -12,6 +12,15 @@ const {
 // =========================================================
 // LOGIN
 // =========================================================
+// POST:
+// /api/login
+//
+// Body:
+//
+// {
+//     "email": "someone@gmail.com"
+// }
+// =========================================================
 
 router.post("/", async (req, res) => {
 
@@ -21,6 +30,10 @@ router.post("/", async (req, res) => {
             email
         } = req.body;
 
+
+        // =====================================================
+        // VALIDATE EMAIL
+        // =====================================================
 
         if (
             !email ||
@@ -38,50 +51,15 @@ router.post("/", async (req, res) => {
             email.trim().toLowerCase();
 
 
-        // =================================================
-        // SUPER ADMIN
-        // =================================================
-
-        if (
-            process.env.SUPER_ADMIN_EMAIL &&
-            cleanEmail ===
-            process.env.SUPER_ADMIN_EMAIL
-                .trim()
-                .toLowerCase()
-        ) {
-
-            const token =
-                await createSession(
-                    cleanEmail,
-                    "super_admin"
-                );
-
-
-            return res.json({
-
-                success: true,
-
-                accountType:
-                    "super_admin",
-
-                email:
-                    cleanEmail,
-
-                message:
-                    "Welcome Super Admin",
-
-                token
-            });
-        }
-
-
-        // =================================================
-        // NORMAL ADMIN / USER
-        // =================================================
+        // =====================================================
+        // FIND ACCOUNT
+        // =====================================================
 
         const [rows] =
             await db.query(
-                `SELECT
+                `
+                SELECT
+
                     acc.id,
                     acc.email,
                     acc.account_type,
@@ -92,26 +70,34 @@ router.post("/", async (req, res) => {
                     r.id AS role_id,
                     r.role_name
 
-                 FROM accounts acc
+                FROM accounts acc
 
-                 INNER JOIN admin_types at
+                INNER JOIN admin_types at
                     ON at.id = acc.admin_type_id
 
-                 LEFT JOIN roles r
+                LEFT JOIN roles r
                     ON r.id = acc.role_id
 
-                 WHERE acc.email = ?
+                WHERE acc.email = ?
 
-                 LIMIT 1`,
+                LIMIT 1
+                `,
                 [cleanEmail]
             );
 
 
+        // =====================================================
+        // EMAIL NOT FOUND
+        // =====================================================
+
         if (rows.length === 0) {
 
             return res.status(404).json({
+
                 success: false,
-                message: "Email not registered"
+
+                message:
+                    "Email not registered"
             });
         }
 
@@ -120,6 +106,10 @@ router.post("/", async (req, res) => {
             rows[0];
 
 
+        // =====================================================
+        // CREATE SESSION
+        // =====================================================
+
         const token =
             await createSession(
                 account.email,
@@ -127,13 +117,12 @@ router.post("/", async (req, res) => {
             );
 
 
-        // =================================================
-        // ADMIN
-        // =================================================
+        // =====================================================
+        // ADMIN LOGIN
+        // =====================================================
 
         if (
-            account.account_type ===
-            "admin"
+            account.account_type === "admin"
         ) {
 
             return res.json({
@@ -146,10 +135,17 @@ router.post("/", async (req, res) => {
                 email:
                     account.email,
 
+                adminTypeId:
+                    account.admin_type_id,
+
                 adminType:
                     account.admin_name,
 
-                role: null,
+                roleId:
+                    null,
+
+                role:
+                    null,
 
                 message:
                     `Welcome Admin - ${account.admin_name}`,
@@ -159,30 +155,54 @@ router.post("/", async (req, res) => {
         }
 
 
-        // =================================================
-        // USER
-        // =================================================
+        // =====================================================
+        // USER LOGIN
+        // =====================================================
 
-        return res.json({
+        if (
+            account.account_type === "user"
+        ) {
 
-            success: true,
+            return res.json({
 
-            accountType:
-                "user",
+                success: true,
 
-            email:
-                account.email,
+                accountType:
+                    "user",
 
-            adminType:
-                account.admin_name,
+                email:
+                    account.email,
 
-            role:
-                account.role_name,
+                adminTypeId:
+                    account.admin_type_id,
+
+                adminType:
+                    account.admin_name,
+
+                roleId:
+                    account.role_id,
+
+                role:
+                    account.role_name,
+
+                message:
+                    `Welcome User - ${account.admin_name} / ${account.role_name}`,
+
+                token
+            });
+        }
+
+
+        // =====================================================
+        // UNKNOWN ACCOUNT TYPE
+        // =====================================================
+
+        return res.status(400).json({
+
+            success: false,
 
             message:
-                `Welcome User - ${account.admin_name} / ${account.role_name}`,
-
-            token
+                "Invalid account type"
         });
 
     }
@@ -194,9 +214,14 @@ router.post("/", async (req, res) => {
         );
 
         res.status(500).json({
+
             success: false,
-            message: "Login failed",
-            error: error.message
+
+            message:
+                "Login failed",
+
+            error:
+                error.message
         });
     }
 });

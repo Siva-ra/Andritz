@@ -4,18 +4,17 @@ require("dotenv").config();
 
 const db = require("./config/db");
 
-const roleManagementRoutes =
-    require("./routes/roleManagementRoutes");
+// ================= ROUTES =================
 
-const adminRoutes =
-    require("./routes/adminRoutes");
+const roleRoutes = require("./routes/roleRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const userRoutes = require("./routes/userRoutes");
+const loginRoutes = require("./routes/loginRoutes");
 
-const userRoutes =
-    require("./routes/userRoutes");
 
-const loginRoutes =
-    require("./routes/loginRoutes");
-
+// =========================================================
+// APP
+// =========================================================
 
 const app = express();
 
@@ -28,9 +27,30 @@ app.use(cors());
 
 app.use(express.json());
 
+app.use(express.urlencoded({
+    extended: true
+}));
+
 
 // =========================================================
-// ROOT
+// API ROUTES
+// =========================================================
+
+// Role Management
+app.use("/api/roles", roleRoutes);
+
+// Create Admin
+app.use("/api/admins", adminRoutes);
+
+// Create User
+app.use("/api/users", userRoutes);
+
+// Login
+app.use("/api/login", loginRoutes);
+
+
+// =========================================================
+// HOME / SERVER TEST
 // =========================================================
 
 app.get("/", (req, res) => {
@@ -40,8 +60,15 @@ app.get("/", (req, res) => {
         success: true,
 
         message:
-            "Andritz 2.0 Backend is running 🚀"
+            "Andritz 2.0 Backend is running 🚀",
+
+        server:
+            "Hostinger",
+
+        api:
+            "/api"
     });
+
 });
 
 
@@ -67,6 +94,7 @@ app.get("/test-db", async (req, res) => {
                 "MySQL connected successfully ✅",
 
             result
+
         });
 
     }
@@ -87,41 +115,16 @@ app.get("/test-db", async (req, res) => {
 
             error:
                 error.message
+
         });
+
     }
+
 });
 
 
 // =========================================================
-// API ROUTES
-// =========================================================
-
-app.use(
-    "/api/role-management",
-    roleManagementRoutes
-);
-
-
-app.use(
-    "/api/admins",
-    adminRoutes
-);
-
-
-app.use(
-    "/api/users",
-    userRoutes
-);
-
-
-app.use(
-    "/api/login",
-    loginRoutes
-);
-
-
-// =========================================================
-// 404
+// 404 API HANDLER
 // =========================================================
 
 app.use((req, res) => {
@@ -131,11 +134,13 @@ app.use((req, res) => {
         success: false,
 
         message:
-            "API route not found",
+            "API endpoint not found",
 
         path:
             req.originalUrl
+
     });
+
 });
 
 
@@ -147,10 +152,17 @@ const PORT =
     process.env.PORT || 5000;
 
 
-app.listen(PORT, () => {
+app.listen(
+    PORT,
+    () => {
 
-    console.log(
-        `Andritz 2.0 Backend running on port ${PORT}`
-    );
+        console.log(
+            `Andritz 2.0 Backend running on port ${PORT}`
+        );
 
-});
+        console.log(
+            "Hostinger API is ready 🚀"
+        );
+
+    }
+);
