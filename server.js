@@ -4,16 +4,19 @@ require("dotenv").config();
 
 const db = require("./config/db");
 
-// ================= ROUTES =================
+// =========================================================
+// ROUTES
+// =========================================================
 
 const roleRoutes = require("./routes/roleRoutes");
+const roleManagementRoutes = require("./routes/roleManagementRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const userRoutes = require("./routes/userRoutes");
 const loginRoutes = require("./routes/loginRoutes");
-const roleManagementRoutes = require("./routes/roleManagementRoutes");
+
 
 // =========================================================
-// APP
+// CREATE EXPRESS APP
 // =========================================================
 
 const app = express();
@@ -23,33 +26,79 @@ const app = express();
 // MIDDLEWARE
 // =========================================================
 
+// Allow Unity / WebGL / other clients
 app.use(cors());
 
+// JSON request body
 app.use(express.json());
 
-app.use(express.urlencoded({
-    extended: true
-}));
+// Form request body
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
 
 
 // =========================================================
 // API ROUTES
 // =========================================================
 
-// Role Management
-app.use("/api/roles", roleRoutes);
+// ---------------------------------------------------------
+// OLD / BASIC ROLE API
+// ---------------------------------------------------------
 
-// Create Admin
-app.use("/api/admins", adminRoutes);
+app.use(
+    "/api/roles",
+    roleRoutes
+);
 
-// Create User
-app.use("/api/users", userRoutes);
 
-// Login
-app.use("/api/login", loginRoutes);
+// ---------------------------------------------------------
+// ROLE MANAGEMENT
+// ---------------------------------------------------------
+// Unity Role Management Panel uses:
+//
+// POST /api/role-management
+// GET  /api/role-management
+//
+// ---------------------------------------------------------
 
-// Role Management
-app.use("/api/role-management", roleManagementRoutes);
+app.use(
+    "/api/role-management",
+    roleManagementRoutes
+);
+
+
+// ---------------------------------------------------------
+// CREATE ADMIN
+// ---------------------------------------------------------
+
+app.use(
+    "/api/admins",
+    adminRoutes
+);
+
+
+// ---------------------------------------------------------
+// CREATE USER
+// ---------------------------------------------------------
+
+app.use(
+    "/api/users",
+    userRoutes
+);
+
+
+// ---------------------------------------------------------
+// LOGIN
+// ---------------------------------------------------------
+
+app.use(
+    "/api/login",
+    loginRoutes
+);
+
 
 // =========================================================
 // HOME / SERVER TEST
@@ -57,7 +106,7 @@ app.use("/api/role-management", roleManagementRoutes);
 
 app.get("/", (req, res) => {
 
-    res.json({
+    res.status(200).json({
 
         success: true,
 
@@ -67,15 +116,34 @@ app.get("/", (req, res) => {
         server:
             "Hostinger",
 
-        api:
-            "/api"
+        database:
+            "MySQL",
+
+        api: {
+
+            roles:
+                "/api/roles",
+
+            roleManagement:
+                "/api/role-management",
+
+            admins:
+                "/api/admins",
+
+            users:
+                "/api/users",
+
+            login:
+                "/api/login"
+        }
+
     });
 
 });
 
 
 // =========================================================
-// DATABASE TEST
+// MYSQL TEST
 // =========================================================
 
 app.get("/test-db", async (req, res) => {
@@ -88,7 +156,7 @@ app.get("/test-db", async (req, res) => {
             );
 
 
-        res.json({
+        res.status(200).json({
 
             success: true,
 
@@ -103,7 +171,7 @@ app.get("/test-db", async (req, res) => {
     catch (error) {
 
         console.error(
-            "MySQL Error:",
+            "❌ MySQL Connection Error:",
             error
         );
 
@@ -126,10 +194,17 @@ app.get("/test-db", async (req, res) => {
 
 
 // =========================================================
-// 404 API HANDLER
+// API 404 HANDLER
 // =========================================================
 
 app.use((req, res) => {
+
+    console.log(
+        "❌ 404:",
+        req.method,
+        req.originalUrl
+    );
+
 
     res.status(404).json({
 
@@ -137,6 +212,9 @@ app.use((req, res) => {
 
         message:
             "API endpoint not found",
+
+        method:
+            req.method,
 
         path:
             req.originalUrl
@@ -147,25 +225,144 @@ app.use((req, res) => {
 
 
 // =========================================================
-// SERVER
+// GLOBAL ERROR HANDLER
 // =========================================================
 
-const PORT = process.env.PORT || 5000;
+app.use(
+    (error, req, res, next) => {
 
-app.listen(PORT, "0.0.0.0", () => {
+        console.error(
+            "❌ SERVER ERROR:",
+            error
+        );
 
-    console.log("=================================");
-    console.log("ANDRITZ 2.0 BACKEND");
-    console.log("=================================");
-    console.log("PORT:", PORT);
-    console.log("ENV:", process.env.NODE_ENV || "not set");
-    console.log("ROLE API: /api/roles");
-    console.log("ADMIN API: /api/admins");
-    console.log("USER API: /api/users");
-    console.log("LOGIN API: /api/login");
-    console.log("ROLE MANAGEMENT API: /api/role-management");
-    console.log("=================================");
-    console.log("SERVER STARTED SUCCESSFULLY 🚀");
+
+        res.status(500).json({
+
+            success: false,
+
+            message:
+                "Internal server error",
+
+            error:
+                error.message
+
+        });
+
+    }
+);
+
+
+// =========================================================
+// START SERVER
+// =========================================================
+
+const PORT =
+    process.env.PORT || 5000;
+
+
+app.listen(
+    PORT,
+    "0.0.0.0",
+    () => {
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "       ANDRITZ 2.0 BACKEND"
+        );
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "Server: Hostinger"
+        );
+
+        console.log(
+            "Port:",
+            PORT
+        );
+
+        console.log(
+            "Environment:",
+            process.env.NODE_ENV || "production"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "ROLE API:"
+        );
+
+        console.log(
+            "GET/POST/DELETE /api/roles"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "ROLE MANAGEMENT:"
+        );
+
+        console.log(
+            "GET/POST /api/role-management"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "ADMIN API:"
+        );
+
+        console.log(
+            "GET/POST /api/admins"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "USER API:"
+        );
+
+        console.log(
+            "GET/POST /api/users"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "LOGIN API:"
+        );
+
+        console.log(
+            "POST /api/login"
+        );
+
+        console.log(
+            "----------------------------------------"
+        );
+
+        console.log(
+            "SERVER STARTED SUCCESSFULLY 🚀"
+        );
+
+        console.log(
+            "========================================"
+        );
 
     }
 );

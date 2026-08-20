@@ -3,58 +3,28 @@ const router = express.Router();
 
 const db = require("../config/db");
 
+
 // =========================================================
-// GET ALL ADMIN TYPES WITH THEIR ROLES
+// GET ALL ROLE MANAGEMENT DATA
 // =========================================================
 
 router.get("/", async (req, res) => {
+
     try {
 
         const [rows] = await db.query(`
             SELECT
-                a.id AS admin_type_id,
-                a.admin_name,
-                r.id AS role_id,
-                r.role_name
-            FROM admin_types a
-            LEFT JOIN roles r
-                ON r.admin_type_id = a.id
-            ORDER BY
-                a.admin_name ASC,
-                r.role_name ASC
+                id,
+                admin_name,
+                role_name,
+                created_at
+            FROM admin_roles
+            ORDER BY admin_name ASC, id ASC
         `);
 
-        const adminTypes = [];
-
-        for (const row of rows) {
-
-            let admin = adminTypes.find(
-                item => item.id === row.admin_type_id
-            );
-
-            if (!admin) {
-
-                admin = {
-                    id: row.admin_type_id,
-                    admin_name: row.admin_name,
-                    roles: []
-                };
-
-                adminTypes.push(admin);
-            }
-
-            if (row.role_id !== null) {
-
-                admin.roles.push({
-                    id: row.role_id,
-                    role_name: row.role_name
-                });
-            }
-        }
-
-        res.json({
+        res.status(200).json({
             success: true,
-            adminTypes: adminTypes
+            data: rows
         });
 
     } catch (error) {
@@ -74,12 +44,27 @@ router.get("/", async (req, res) => {
 
 
 // =========================================================
-// SAVE ADMIN + ROLES
+// SAVE ADMIN + MULTIPLE ROLES
+// =========================================================
+//
+// POST /api/role-management
+//
+// Body:
+//
+// {
+//     "adminName": "Backend Developer",
+//     "roles": [
+//         "node.js",
+//         "express.js",
+//         "mysql"
+//     ]
+// }
+//
 // =========================================================
 
 router.post("/", async (req, res) => {
 
-    const connection = await db.getConnection();
+    let connection;
 
     try {
 
@@ -89,12 +74,19 @@ router.post("/", async (req, res) => {
         } = req.body;
 
 
-        // -------------------------------------------------
-        // VALIDATE ADMIN NAME
-        // -------------------------------------------------
+        console.log("=================================");
+        console.log("ROLE MANAGEMENT SAVE");
+        console.log("Admin Name:", adminName);
+        console.log("Roles:", roles);
+        console.log("=================================");
+
+
+        // =================================================
+        // CHECK ADMIN NAME
+        // =================================================
 
         if (
-            !adminName ||
+            typeof adminName !== "string" ||
             !adminName.trim()
         ) {
 
@@ -105,9 +97,9 @@ router.post("/", async (req, res) => {
         }
 
 
-        // -------------------------------------------------
-        // VALIDATE ROLES
-        // -------------------------------------------------
+        // =================================================
+        // CHECK ROLES ARRAY
+        // =================================================
 
         if (
             !Array.isArray(roles) ||
@@ -121,15 +113,40 @@ router.post("/", async (req, res) => {
         }
 
 
+        // =================================================
+        // CLEAN ADMIN NAME
+        // =================================================
+
         const cleanAdminName =
             adminName.trim();
 
 
-        const cleanRoles =
-            roles
-                .map(role => role.trim())
-                .filter(role => role.length > 0);
+        // =================================================
+        // CLEAN ROLES
+        // =================================================
 
+        const cleanRoles = [
+            ...new Set(
+                roles
+                    .filter(
+                        role =>
+                            typeof role === "string"
+                    )
+                    .map(
+                        role =>
+                            role.trim()
+                    )
+                    .filter(
+                        role =>
+                            role.length > 0
+                    )
+            )
+        ];
+
+
+        // =================================================
+        // CHECK CLEAN ROLES
+        // =================================================
 
         if (cleanRoles.length === 0) {
 
@@ -140,158 +157,180 @@ router.post("/", async (req, res) => {
         }
 
 
-        // -------------------------------------------------
+        // =================================================
+        // GET DATABASE CONNECTION
+        // =================================================
+
+        connection =
+            await db.getConnection();
+
+
+        // =================================================
         // START TRANSACTION
-        // -------------------------------------------------
+        // =================================================
 
         await connection.beginTransaction();
 
 
-        // -------------------------------------------------
-        // CHECK ADMIN
-        // -------------------------------------------------
+        // =================================================
+        // CHECK IF ADMIN ALREADY EXISTS
+        // =================================================
 
         const [existingAdmin] =
             await connection.query(
                 `
                 SELECT id
-                FROM admin_types
+                FROM admin_roles
                 WHERE admin_name = ?
                 LIMIT 1
                 `,
-                [cleanAdminName]
+                [
+                    cleanAdminName
+                ]
             );
 
 
-        let adminTypeId;
-
-
-        if (existingAdmin.length > 0) {
-
-            adminTypeId =
-                existingAdmin[0].id;
-
-        } else {
-
-            const [adminResult] =
-                await connection.query(
-                    `
-                    INSERT INTO admin_types
-                    (admin_name)
-                    VALUES (?)
-                    `,
-                    [cleanAdminName]
-                );
-
-            adminTypeId =
-                adminResult.insertId;
-        }
-
-
-        // -------------------------------------------------
+        // =================================================
         // INSERT ROLES
-        // -------------------------------------------------
+        // =================================================
 
         let addedRoles = [];
 
 
-        for (const roleName of cleanRoles) {
+        for (const role of cleanRoles) {
 
-            // Check duplicate role under this admin
+            // ---------------------------------------------
+            // Check duplicate role
+            // ---------------------------------------------
 
             const [existingRole] =
                 await connection.query(
                     `
                     SELECT id
-                    FROM roles
-                    WHERE admin_type_id = ?
+                    FROM admin_roles
+                    WHERE admin_name = ?
                     AND role_name = ?
                     LIMIT 1
                     `,
                     [
-                        adminTypeId,
-                        roleName
+                        cleanAdminName,
+                        role
                     ]
                 );
 
 
-            if (existingRole.length > 0) {
+            // ---------------------------------------------
+            // Add only if it doesn't already exist
+            // ---------------------------------------------
 
-                continue;
-            }
+            if (existingRole.length === 0) {
 
-
-            const [roleResult] =
                 await connection.query(
                     `
-                    INSERT INTO roles
+                    INSERT INTO admin_roles
                     (
-                        admin_type_id,
+                        admin_name,
                         role_name
                     )
                     VALUES (?, ?)
                     `,
                     [
-                        adminTypeId,
-                        roleName
+                        cleanAdminName,
+                        role
                     ]
                 );
 
-
-            addedRoles.push({
-                id: roleResult.insertId,
-                role_name: roleName
-            });
+                addedRoles.push(role);
+            }
         }
 
 
-        // -------------------------------------------------
+        // =================================================
         // COMMIT
-        // -------------------------------------------------
+        // =================================================
 
         await connection.commit();
 
 
-        res.status(201).json({
+        // =================================================
+        // RESPONSE
+        // =================================================
+
+        res.status(
+            existingAdmin.length === 0
+                ? 201
+                : 200
+        ).json({
 
             success: true,
 
             message:
-                "Admin and roles saved successfully",
+                existingAdmin.length === 0
+                    ? "Admin and roles saved successfully"
+                    : "Roles saved successfully",
 
-            admin: {
-                id: adminTypeId,
-                admin_name: cleanAdminName
-            },
+            adminName:
+                cleanAdminName,
 
-            roles: addedRoles
+            roles:
+                cleanRoles,
 
+            addedRoles:
+                addedRoles
         });
 
-    } catch (error) {
+    }
+    catch (error) {
 
-        await connection.rollback();
+        // =================================================
+        // ROLLBACK
+        // =================================================
+
+        if (connection) {
+
+            try {
+
+                await connection.rollback();
+
+            } catch (rollbackError) {
+
+                console.error(
+                    "Rollback Error:",
+                    rollbackError
+                );
+            }
+        }
+
 
         console.error(
             "Save Role Management Error:",
             error
         );
 
+
         res.status(500).json({
 
             success: false,
 
             message:
-                "Failed to save admin and roles",
+                "Failed to save roles",
 
             error:
                 error.message
-
         });
 
-    } finally {
+    }
+    finally {
 
-        connection.release();
+        // =================================================
+        // RELEASE CONNECTION
+        // =================================================
+
+        if (connection) {
+
+            connection.release();
+
+        }
     }
 });
 
