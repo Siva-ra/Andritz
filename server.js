@@ -3,11 +3,15 @@ const cors = require("cors");
 require("dotenv").config();
 
 const db = require("./config/db");
-
+const roleRoutes = require("./routes/roleRoutes");
+    
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// ================= ROLE ROUTES =================
+app.use("/roles", roleRoutes);
 
 app.get("/", (req, res) => {
     res.json({
