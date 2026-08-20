@@ -3,7 +3,19 @@ const cors = require("cors");
 require("dotenv").config();
 
 const db = require("./config/db");
-const roleRoutes = require("./routes/roleRoutes");
+
+const roleManagementRoutes =
+    require("./routes/roleManagementRoutes");
+
+const adminRoutes =
+    require("./routes/adminRoutes");
+
+const userRoutes =
+    require("./routes/userRoutes");
+
+const loginRoutes =
+    require("./routes/loginRoutes");
+
 
 const app = express();
 
@@ -18,16 +30,18 @@ app.use(express.json());
 
 
 // =========================================================
-// HOME
+// ROOT
 // =========================================================
 
 app.get("/", (req, res) => {
 
     res.json({
-        success: true,
-        message: "Andritz 2.0 Backend is running 🚀"
-    });
 
+        success: true,
+
+        message:
+            "Andritz 2.0 Backend is running 🚀"
+    });
 });
 
 
@@ -46,13 +60,17 @@ app.get("/test-db", async (req, res) => {
 
 
         res.json({
+
             success: true,
-            message: "MySQL connected successfully ✅",
+
+            message:
+                "MySQL connected successfully ✅",
+
             result
         });
 
-
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
             "MySQL Error:",
@@ -70,24 +88,40 @@ app.get("/test-db", async (req, res) => {
             error:
                 error.message
         });
-
     }
-
 });
 
 
 // =========================================================
-// ROLE ROUTES
+// API ROUTES
 // =========================================================
 
 app.use(
-    "/roles",
-    roleRoutes
+    "/api/role-management",
+    roleManagementRoutes
+);
+
+
+app.use(
+    "/api/admins",
+    adminRoutes
+);
+
+
+app.use(
+    "/api/users",
+    userRoutes
+);
+
+
+app.use(
+    "/api/login",
+    loginRoutes
 );
 
 
 // =========================================================
-// 404 HANDLER
+// 404
 // =========================================================
 
 app.use((req, res) => {
@@ -97,12 +131,11 @@ app.use((req, res) => {
         success: false,
 
         message:
-            "API endpoint not found",
+            "API route not found",
 
         path:
             req.originalUrl
     });
-
 });
 
 
@@ -114,13 +147,10 @@ const PORT =
     process.env.PORT || 5000;
 
 
-app.listen(
-    PORT,
-    () => {
+app.listen(PORT, () => {
 
-        console.log(
-            `✅Server running on port ${PORT}`
-        );
+    console.log(
+        `Andritz 2.0 Backend running on port ${PORT}`
+    );
 
-    }
-);
+});
