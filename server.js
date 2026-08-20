@@ -163,6 +163,7 @@ app.listen(PORT, "0.0.0.0", () => {
     console.log("ADMIN API: /api/admins");
     console.log("USER API: /api/users");
     console.log("LOGIN API: /api/login");
+    console.log("ROLE MANAGEMENT API: /api/role-management");
     console.log("=================================");
     console.log("SERVER STARTED SUCCESSFULLY 🚀");
 
