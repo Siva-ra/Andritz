@@ -366,3 +366,12 @@ app.listen(
 
     }
 );
+
+app.get("/api/role-management-test", (req, res) => {
+
+    res.json({
+        success: true,
+        message: "Role Management route is LIVE on Hostinger 🚀"
+    });
+
+});
