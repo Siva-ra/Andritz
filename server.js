@@ -10,7 +10,7 @@ const roleRoutes = require("./routes/roleRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const userRoutes = require("./routes/userRoutes");
 const loginRoutes = require("./routes/loginRoutes");
-
+const roleManagementRoutes = require("./routes/roleManagementRoutes");
 
 // =========================================================
 // APP
@@ -48,6 +48,8 @@ app.use("/api/users", userRoutes);
 // Login
 app.use("/api/login", loginRoutes);
 
+// Role Management
+app.use("/api/role-management", roleManagementRoutes);
 
 // =========================================================
 // HOME / SERVER TEST
