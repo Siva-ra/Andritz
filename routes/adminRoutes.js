@@ -1,5 +1,4 @@
 const express = require("express");
-
 const router = express.Router();
 
 const db = require("../config/db");
@@ -8,23 +7,43 @@ const db = require("../config/db");
 // =========================================================
 // GET ADMIN TYPES
 // =========================================================
+// Loads Admin Types created from Role Management.
+//
+// GET:
+// /api/admins/types
+//
+// Example:
+//
+// {
+//     "success": true,
+//     "adminTypes": [
+//         {
+//             "id": 1,
+//             "admin_name": "Backend Developer"
+//         }
+//     ]
+// }
+// =========================================================
 
 router.get("/types", async (req, res) => {
 
     try {
 
-        const [rows] = await db.query(
-            `SELECT
+        const [rows] = await db.query(`
+            SELECT
                 id,
                 admin_name
-             FROM admin_types
-             ORDER BY admin_name ASC`
-        );
+            FROM admin_types
+            ORDER BY admin_name ASC
+        `);
 
 
-        res.json({
+        res.status(200).json({
+
             success: true,
+
             adminTypes: rows
+
         });
 
     }
@@ -35,17 +54,37 @@ router.get("/types", async (req, res) => {
             error
         );
 
+
         res.status(500).json({
+
             success: false,
-            message: "Failed to load admin types",
-            error: error.message
+
+            message:
+                "Failed to load admin types",
+
+            error:
+                error.message
+
         });
+
     }
+
 });
 
 
 // =========================================================
 // CREATE ADMIN
+// =========================================================
+// POST:
+// /api/admins
+//
+// Body:
+//
+// {
+//     "email": "admin@gmail.com",
+//     "adminTypeId": 1
+// }
+//
 // =========================================================
 
 router.post("/", async (req, res) => {
@@ -58,49 +97,86 @@ router.post("/", async (req, res) => {
         } = req.body;
 
 
+        // =================================================
+        // VALIDATE EMAIL
+        // =================================================
+
         if (
-            !email ||
+            typeof email !== "string" ||
             !email.trim()
         ) {
 
             return res.status(400).json({
+
                 success: false,
-                message: "Email is required"
+
+                message:
+                    "Email is required"
+
             });
+
         }
 
+
+        // =================================================
+        // VALIDATE ADMIN TYPE
+        // =================================================
 
         if (!adminTypeId) {
 
             return res.status(400).json({
+
                 success: false,
-                message: "Admin type is required"
+
+                message:
+                    "Admin type is required"
+
             });
+
         }
 
+
+        // =================================================
+        // CLEAN EMAIL
+        // =================================================
 
         const cleanEmail =
             email.trim().toLowerCase();
 
 
+        // =================================================
+        // CHECK ADMIN TYPE
+        // =================================================
+
         const [adminTypeRows] =
             await db.query(
-                `SELECT
+                `
+                SELECT
                     id,
                     admin_name
-                 FROM admin_types
-                 WHERE id = ?
-                 LIMIT 1`,
-                [adminTypeId]
+                FROM admin_types
+                WHERE id = ?
+                LIMIT 1
+                `,
+                [
+                    adminTypeId
+                ]
             );
 
 
-        if (adminTypeRows.length === 0) {
+        if (
+            adminTypeRows.length === 0
+        ) {
 
             return res.status(404).json({
+
                 success: false,
-                message: "Admin type not found"
+
+                message:
+                    "Admin type not found"
+
             });
+
         }
 
 
@@ -108,28 +184,49 @@ router.post("/", async (req, res) => {
             adminTypeRows[0];
 
 
+        // =================================================
+        // CHECK EXISTING EMAIL
+        // =================================================
+
         const [existing] =
             await db.query(
-                `SELECT id
-                 FROM accounts
-                 WHERE email = ?
-                 LIMIT 1`,
-                [cleanEmail]
+                `
+                SELECT
+                    id
+                FROM accounts
+                WHERE email = ?
+                LIMIT 1
+                `,
+                [
+                    cleanEmail
+                ]
             );
 
 
-        if (existing.length > 0) {
+        if (
+            existing.length > 0
+        ) {
 
             return res.status(409).json({
+
                 success: false,
-                message: "Email already exists"
+
+                message:
+                    "Email already exists"
+
             });
+
         }
 
 
+        // =================================================
+        // CREATE ADMIN ACCOUNT
+        // =================================================
+
         const [result] =
             await db.query(
-                `INSERT INTO accounts
+                `
+                INSERT INTO accounts
                 (
                     email,
                     account_type,
@@ -137,13 +234,23 @@ router.post("/", async (req, res) => {
                     role_id
                 )
                 VALUES
-                (?, 'admin', ?, NULL)`,
+                (
+                    ?,
+                    'admin',
+                    ?,
+                    NULL
+                )
+                `,
                 [
                     cleanEmail,
                     adminType.id
                 ]
             );
 
+
+        // =================================================
+        // SUCCESS
+        // =================================================
 
         res.status(201).json({
 
@@ -158,11 +265,15 @@ router.post("/", async (req, res) => {
             email:
                 cleanEmail,
 
+            accountType:
+                "admin",
+
             adminTypeId:
                 adminType.id,
 
             adminType:
                 adminType.admin_name
+
         });
 
     }
@@ -173,12 +284,21 @@ router.post("/", async (req, res) => {
             error
         );
 
+
         res.status(500).json({
+
             success: false,
-            message: "Failed to create admin",
-            error: error.message
+
+            message:
+                "Failed to create admin",
+
+            error:
+                error.message
+
         });
+
     }
+
 });
 
 
